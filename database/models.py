@@ -1,5 +1,8 @@
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import ForeignKey, String
+from typing import List
+from datetime import datetime, timezone
+
 
 class Base(DeclarativeBase):
     pass
@@ -15,6 +18,16 @@ class Tags(Base):
     low_limit: Mapped[float] = mapped_column(nullable=False)
     high_limit: Mapped[float] = mapped_column(nullable=False)
     egu: Mapped[str] = mapped_column(nullable=False)
-    created_at: Mapped[str] = mapped_column(nullable=False)
-    updated_at: Mapped[str] = mapped_column(nullable=False)
+    created_at: Mapped[str] = mapped_column(nullable=False, server_default=datetime.now(timezone.utc))
+    updated_at: Mapped[str] = mapped_column(nullable=False, server_default=datetime.now(timezone.utc))
     deleted_at: Mapped[str] = mapped_column(nullable=True)
+    data: Mapped[List["Data"]] = relationship()
+
+
+class Data(Base):
+    __tablename__ = 'test'
+
+    id: Mapped[int] = mapped_column(primary_key=True, nullable=False)
+    timestamp: Mapped[str] = mapped_column(nullable=False)
+    value: Mapped[float] = mapped_column(nullable=False)
+    tag_id: Mapped[int] = mapped_column(ForeignKey('tags.id'))
