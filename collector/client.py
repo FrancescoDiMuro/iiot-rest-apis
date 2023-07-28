@@ -1,6 +1,5 @@
 
 import logging
-import matplotlib.dates
 import matplotlib.pyplot as plt
 import numpy as np
 import os.path
@@ -10,11 +9,12 @@ import schedule
 import time
 from datetime import datetime
 from snap7.util import get_real
-from typing import Dict, List
+from typing import Dict, List, Union
 
 from database.models import Base
 import sqlalchemy
 from sqlalchemy.orm import Session, sessionmaker
+from database.models import Data
 
 
 def initialize_logger() -> logging.Logger:
@@ -38,7 +38,12 @@ def initialize_logger() -> logging.Logger:
 
 
 def db_connect(db_filename: str) -> sqlalchemy.Engine | None:
-    engine: sqlalchemy.Engine = sqlalchemy.create_engine('sqlite+pysqlite:///data.db', echo=True)
+    DB_TYPE: str = 'sqlite'
+    DB_API: str = 'pysqlite'
+    DB_RELATIVE_FILE_PATH: str = '/data.db'
+    DB_CONNECTION_STRING: str = f'{DB_TYPE}+{DB_API}://{DB_RELATIVE_FILE_PATH}'
+
+    engine: sqlalchemy.Engine = sqlalchemy.create_engine(DB_CONNECTION_STRING, echo=True)
     Base.metadata.create_all(bind=engine)
 
     return engine if isinstance(engine, sqlalchemy.Engine) else None
@@ -51,8 +56,8 @@ def plc_connect(plc_ip_address: int, plc_rack: int = 0, plc_slot: int = 0, plc_p
     return client if client.get_connected() else None
 
 
-def read_data_from_plc(client: snap7.client.Client, tags: Dict[str, int]) -> List[tuple]:
-    data: list = []
+def read_data_from_plc(client: snap7.client.Client, tags: Dict[str, Dict[str, str]]) -> List[tuple]:
+    data: List[Dict[str, Union[str, float]]] = []
 
     for tag_name, tag_fields in tags.items():
         timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
@@ -63,11 +68,12 @@ def read_data_from_plc(client: snap7.client.Client, tags: Dict[str, int]) -> Lis
 
 
 def store_data_every_minute(client: snap7.client.Client, tags: Dict[str, int], db_session: Session) -> bool:
-        
-
+    
     data = read_data_from_plc(client, tags)
     
-    db_session.
+    for record in data:
+        db_session.add(Data())
+    # db_session.
     if isinstance(db_cursor.executemany('INSERT INTO data VALUES (?, ?, ?)', data), sqlite3.Cursor):
         db_engine.commit()
         logger.info('store_data_every_minute -> OK')
@@ -93,8 +99,6 @@ PLC_IP_ADDRESS: str = '10.149.23.65'
 PLC_RACK: int = 0
 PLC_SLOT: int = 1
 PLC_PORT: int = 102
-
-DATA_DB_FILE_NAME: str = '..\database\data.db'
 
 EVERY_FIVE_MINUTES: int = 300
 Y_TICK_STEP: int = 10
@@ -133,7 +137,7 @@ if db_engine is not None:
             schedule.every().minute.do(store_data_every_minute, client, tags_one_minute, db_engine)
             schedule.every(5).minutes.do(store_data_every_five_minutes, client, tags_five_minutes, db_engine)
             time.sleep(1)
-            
+
         # try:
         #     query_start_timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
 
