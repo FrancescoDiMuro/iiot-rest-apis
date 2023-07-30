@@ -1,7 +1,7 @@
-
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
+from os import getcwd
 import os.path
 import snap7
 import sqlite3
@@ -11,10 +11,13 @@ from datetime import datetime
 from snap7.util import get_real
 from typing import Dict, List, Union
 
-from database.models import Base
+import sys
+
+sys.path.append(getcwd())
+
 import sqlalchemy
 from sqlalchemy.orm import Session, sessionmaker
-from database.models import Data
+from database.models import Base, Tags, Data
 
 
 def initialize_logger() -> logging.Logger:
@@ -37,14 +40,14 @@ def initialize_logger() -> logging.Logger:
     return logger
 
 
-def db_connect(db_filename: str) -> sqlalchemy.Engine | None:
+def db_connect() -> sqlalchemy.Engine | None:
     DB_TYPE: str = 'sqlite'
     DB_API: str = 'pysqlite'
     DB_RELATIVE_FILE_PATH: str = '/data.db'
     DB_CONNECTION_STRING: str = f'{DB_TYPE}+{DB_API}://{DB_RELATIVE_FILE_PATH}'
 
     engine: sqlalchemy.Engine = sqlalchemy.create_engine(DB_CONNECTION_STRING, echo=True)
-    Base.metadata.create_all(bind=engine)
+    # Base.metadata.create_all(bind=engine)
 
     return engine if isinstance(engine, sqlalchemy.Engine) else None
 
@@ -74,7 +77,7 @@ def store_data_every_minute(client: snap7.client.Client, tags: Dict[str, int], d
     for record in data:
         db_session.add(Data())
     # db_session.
-    if isinstance(db_cursor.executemany('INSERT INTO data VALUES (?, ?, ?)', data), sqlite3.Cursor):
+    if isinstance(db_session.executemany('INSERT INTO data VALUES (?, ?, ?)', data), sqlite3.Cursor):
         db_engine.commit()
         logger.info('store_data_every_minute -> OK')
         return True
@@ -104,8 +107,7 @@ EVERY_FIVE_MINUTES: int = 300
 Y_TICK_STEP: int = 10
 
 # Tags' lists
-tags_one_minute: Dict[str, int] = {'pv': {'db_number': 842, 'start': 48, 'size': 4}}
-
+tags_one_minute: List[Data] = []
 tags_five_minutes: Dict[str, int] = {'set-ll': {'db_number': 842, 'start': 32, 'size': 4},
                                      'set-l' : {'db_number': 842, 'start': 36, 'size': 4},
                                      'set-h' : {'db_number': 842, 'start': 40, 'size': 4},
@@ -121,7 +123,7 @@ values: list = []
 logger = initialize_logger()
     
 # Connection with DB
-db_engine = db_connect(DATA_DB_FILE_NAME)
+db_engine = db_connect()
 if db_engine is not None:
     logger.info('Connection with DB -> OK')
 
@@ -133,7 +135,16 @@ if db_engine is not None:
 
         logger.info('Connection with PLC -> OK')
 
-        with Session.begin() as session:  
+        with Session.begin() as session:
+            stmt = sqlalchemy.select(Tags.id, Tags.address).order_by(Tags.id)
+            print(f'Statement: {stmt}')
+            l = session.execute(statement=stmt)
+            # print(isinstance(l, sqlalchemy.Result))
+            print(l.all())
+            for tag in l:
+                print(tag.id)
+
+            quit()
             schedule.every().minute.do(store_data_every_minute, client, tags_one_minute, db_engine)
             schedule.every(5).minutes.do(store_data_every_five_minutes, client, tags_five_minutes, db_engine)
             time.sleep(1)
