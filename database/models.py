@@ -1,11 +1,11 @@
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass, Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey, String
 from typing import List
 from datetime import datetime, timezone
 
 TIMESTAMP_FORMAT: str = '%Y%m%dT%H%M%S'
 
-class Base(DeclarativeBase):
+class Base(MappedAsDataclass, DeclarativeBase):
     pass
 
 class Tags(Base):
@@ -26,7 +26,7 @@ class Tags(Base):
 
 
 class Data(Base):
-    __tablename__ = 'test'
+    __tablename__ = 'data'
 
     id: Mapped[int] = mapped_column(primary_key=True, nullable=False)
     timestamp: Mapped[str] = mapped_column(nullable=False)

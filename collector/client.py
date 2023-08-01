@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 from snap7.util import get_real
 from typing import Dict, List, Union
+from re import findall
 
 import sys
 
@@ -47,7 +48,7 @@ def db_connect() -> sqlalchemy.Engine | None:
     DB_CONNECTION_STRING: str = f'{DB_TYPE}+{DB_API}://{DB_RELATIVE_FILE_PATH}'
 
     engine: sqlalchemy.Engine = sqlalchemy.create_engine(DB_CONNECTION_STRING, echo=True)
-    # Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
 
     return engine if isinstance(engine, sqlalchemy.Engine) else None
 
@@ -61,11 +62,13 @@ def plc_connect(plc_ip_address: int, plc_rack: int = 0, plc_slot: int = 0, plc_p
 
 def read_data_from_plc(client: snap7.client.Client, tags: Dict[str, Dict[str, str]]) -> List[tuple]:
     data: List[Dict[str, Union[str, float]]] = []
+    
 
-    for tag_name, tag_fields in tags.items():
-        timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
-        value = round(get_real(client.db_read(**tag_fields), 0), 2)
-        data.append((timestamp, tag_name, value))
+    for tag in tags:
+        for tag_id, tag_fields in tag.items():
+            timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
+            value = round(get_real(client.db_read(**tag_fields), 0), 2)
+            data.append((timestamp, value, tag_id))
 
     return data
 
@@ -75,10 +78,10 @@ def store_data_every_minute(client: snap7.client.Client, tags: Dict[str, int], d
     data = read_data_from_plc(client, tags)
     
     for record in data:
-        db_session.add(Data())
-    # db_session.
-    if isinstance(db_session.executemany('INSERT INTO data VALUES (?, ?, ?)', data), sqlite3.Cursor):
-        db_engine.commit()
+        timestamp, value, tag_id = record
+        d = Data(timestamp=timestamp, value=value, tag_id=tag_id)
+        print(d)
+        db_session.add(d)        
         logger.info('store_data_every_minute -> OK')
         return True
     
@@ -106,13 +109,11 @@ PLC_PORT: int = 102
 EVERY_FIVE_MINUTES: int = 300
 Y_TICK_STEP: int = 10
 
+TAG_ADDRESS_PATTERN: str = r'^DB(?P<db_number>[^@]+)@(?P<start>[^-]+)\-\>(?P<size>\d+)$'
+
 # Tags' lists
-tags_one_minute: List[Data] = []
-tags_five_minutes: Dict[str, int] = {'set-ll': {'db_number': 842, 'start': 32, 'size': 4},
-                                     'set-l' : {'db_number': 842, 'start': 36, 'size': 4},
-                                     'set-h' : {'db_number': 842, 'start': 40, 'size': 4},
-                                     'set-hh': {'db_number': 842, 'start': 44, 'size': 4}
-                                    }
+tags_one_minute: List[Tags] = []
+tags_five_minutes: List[Tags] = []
 
 process_values: list = []
 setpoints: list = []
@@ -136,18 +137,33 @@ if db_engine is not None:
         logger.info('Connection with PLC -> OK')
 
         with Session.begin() as session:
-            stmt = sqlalchemy.select(Tags.id, Tags.address).order_by(Tags.id)
-            print(f'Statement: {stmt}')
-            l = session.execute(statement=stmt)
-            # print(isinstance(l, sqlalchemy.Result))
-            print(l.all())
-            for tag in l:
-                print(tag.id)
+            sql_statement = sqlalchemy.select(Tags.id, Tags.address).where(Tags.collection_interval == '1 min'). \
+                            order_by(Tags.id)
+            rows = session.execute(statement=sql_statement).all()
+            for row in rows:
+                db_number, start, size = findall(TAG_ADDRESS_PATTERN, row.address)[0]               
+                tag = {
+                        row.id: {
+                            'db_number': int(db_number),
+                            'start': int(start),
+                            'size': int(size)
+                        }
+                      }
+                
+                tags_one_minute.append(tag)                
 
-            quit()
-            schedule.every().minute.do(store_data_every_minute, client, tags_one_minute, db_engine)
-            schedule.every(5).minutes.do(store_data_every_five_minutes, client, tags_five_minutes, db_engine)
-            time.sleep(1)
+            
+            schedule.every(5).seconds.do(store_data_every_minute, client, tags_one_minute, session)
+            #schedule.every().minute.do(store_data_every_minute, client, tags_one_minute, session)
+            # schedule.every(5).minutes.do(store_data_every_five_minutes, client, tags_five_minutes, db_engine)
+
+            while 1:
+                try:
+                    schedule.run_pending()
+                    time.sleep(1)
+                except KeyboardInterrupt:
+                    print('Done.')
+                    quit()
 
         # try:
         #     query_start_timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
