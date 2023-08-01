@@ -11,7 +11,7 @@ class Base(MappedAsDataclass, DeclarativeBase):
 class Tags(Base):
     __tablename__ = 'tags'
 
-    id: Mapped[int] = mapped_column(primary_key=True, nullable=False)
+    id: Mapped[int] = mapped_column(init=False, primary_key=True, nullable=False)
     name: Mapped[str] = mapped_column(String(30), nullable=False)
     description: Mapped[str] = mapped_column(String(40), nullable=False)
     address: Mapped[str] = mapped_column(nullable=False)
@@ -28,7 +28,7 @@ class Tags(Base):
 class Data(Base):
     __tablename__ = 'data'
 
-    id: Mapped[int] = mapped_column(primary_key=True, nullable=False)
+    id: Mapped[int] = mapped_column(init=False, primary_key=True, nullable=False)
     timestamp: Mapped[str] = mapped_column(nullable=False)
     value: Mapped[float] = mapped_column(nullable=False)
     tag_id: Mapped[int] = mapped_column(ForeignKey('tags.id'))
