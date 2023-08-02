@@ -1,17 +1,17 @@
 from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass, Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, Identity
 from typing import List
 from datetime import datetime, timezone
 
 TIMESTAMP_FORMAT: str = '%Y%m%dT%H%M%S'
 
-class Base(MappedAsDataclass, DeclarativeBase):
+class Base(DeclarativeBase):
     pass
 
 class Tags(Base):
     __tablename__ = 'tags'
 
-    id: Mapped[int] = mapped_column(init=False, primary_key=True, nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True, nullable=False)
     name: Mapped[str] = mapped_column(String(30), nullable=False)
     description: Mapped[str] = mapped_column(String(40), nullable=False)
     address: Mapped[str] = mapped_column(nullable=False)
@@ -28,7 +28,10 @@ class Tags(Base):
 class Data(Base):
     __tablename__ = 'data'
 
-    id: Mapped[int] = mapped_column(init=False, primary_key=True, nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True, nullable=False)
     timestamp: Mapped[str] = mapped_column(nullable=False)
     value: Mapped[float] = mapped_column(nullable=False)
     tag_id: Mapped[int] = mapped_column(ForeignKey('tags.id'))
+
+    def __repr__(self) -> str:
+        return f'<Data {self.id=} {self.timestamp=} {self.value=} {self.tag_id=}>'

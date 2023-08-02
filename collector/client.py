@@ -73,32 +73,38 @@ def read_data_from_plc(client: snap7.client.Client, tags: Dict[str, Dict[str, st
     return data
 
 
-def store_data_every_minute(client: snap7.client.Client, tags: Dict[str, int], db_session: Session) -> bool:
+def store_data_every_minute(client: snap7.client.Client, tags: Dict[str, Dict[str, int]], 
+                            db_session: Session) -> bool:
     
     data = read_data_from_plc(client, tags)
+    records: list = []
     
     for record in data:
         timestamp, value, tag_id = record
-        d = Data(timestamp=timestamp, value=value, tag_id=tag_id)
-        print(d)
-        db_session.add(d)        
-        logger.info('store_data_every_minute -> OK')
-        return True
+        records.append(Data(timestamp=timestamp, value=value, tag_id=tag_id))
     
-    return False
+    db_session.add_all(records)
+    db_session.commit()
+
+    logger.info('store_data_every_minute -> OK')
+    return True
 
 
-def store_data_every_five_minutes(client: snap7.client.Client, tags: Dict[str, int], db_connection: sqlite3.Connection) -> bool:
+def store_data_every_five_minutes(client: snap7.client.Client, tags: Dict[str, Dict[str, int]], 
+                                  db_session: Session) -> bool:
     
-    db_cursor = db_connection.cursor()
-
     data = read_data_from_plc(client, tags)
-    if isinstance( db_cursor.executemany('INSERT INTO data VALUES (?, ?, ?)', data), sqlite3.Cursor):
-        db_connection.commit()
-        logger.info('store_data_every_five_minutes -> OK')
-        return True
+    records: list = []
     
-    return False
+    for record in data:
+        timestamp, value, tag_id = record
+        records.append(Data(timestamp=timestamp, value=value, tag_id=tag_id))
+    
+    db_session.add_all(records)
+    db_session.commit()
+
+    logger.info('store_data_every_five_minutes -> OK')
+    return True
 
 # Start application
 PLC_IP_ADDRESS: str = '10.149.23.65'
@@ -136,7 +142,10 @@ if db_engine is not None:
 
         logger.info('Connection with PLC -> OK')
 
-        with Session.begin() as session:
+        # with Session.begin() as session:
+        with Session() as session:
+
+            # Tags one minute
             sql_statement = sqlalchemy.select(Tags.id, Tags.address).where(Tags.collection_interval == '1 min'). \
                             order_by(Tags.id)
             rows = session.execute(statement=sql_statement).all()
@@ -150,19 +159,33 @@ if db_engine is not None:
                         }
                       }
                 
-                tags_one_minute.append(tag)                
+                tags_one_minute.append(tag)             
 
+            # Tags five minutes
+            sql_statement = sqlalchemy.select(Tags.id, Tags.address).where(Tags.collection_interval == '5 min'). \
+                            order_by(Tags.id)
+            rows = session.execute(statement=sql_statement).all()
+            for row in rows:
+                db_number, start, size = findall(TAG_ADDRESS_PATTERN, row.address)[0]               
+                tag = {
+                        row.id: {
+                            'db_number': int(db_number),
+                            'start': int(start),
+                            'size': int(size)
+                        }
+                      }
+                
+                tags_five_minutes.append(tag)   
             
-            schedule.every(5).seconds.do(store_data_every_minute, client, tags_one_minute, session)
-            #schedule.every().minute.do(store_data_every_minute, client, tags_one_minute, session)
-            # schedule.every(5).minutes.do(store_data_every_five_minutes, client, tags_five_minutes, db_engine)
+            schedule.every().minute.do(store_data_every_minute, client, tags_one_minute, session)
+            schedule.every(5).minutes.do(store_data_every_five_minutes, client, tags_five_minutes, session)
 
             while 1:
                 try:
                     schedule.run_pending()
                     time.sleep(1)
                 except KeyboardInterrupt:
-                    print('Done.')
+                    print('Collection stopped by user.')
                     quit()
 
         # try:
