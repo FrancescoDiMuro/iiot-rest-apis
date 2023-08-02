@@ -1,10 +1,7 @@
 import logging
-import matplotlib.pyplot as plt
-import numpy as np
 from os import getcwd
 import os.path
 import snap7
-import sqlite3
 import schedule
 import time
 from datetime import datetime
@@ -106,6 +103,7 @@ def store_data_every_five_minutes(client: snap7.client.Client, tags: Dict[str, D
     logger.info('store_data_every_five_minutes -> OK')
     return True
 
+
 # Start application
 PLC_IP_ADDRESS: str = '10.149.23.65'
 PLC_RACK: int = 0
@@ -187,89 +185,3 @@ if db_engine is not None:
                 except KeyboardInterrupt:
                     print('Collection stopped by user.')
                     quit()
-
-        # try:
-        #     query_start_timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
-
-        #     while 1:
-        #         schedule.run_pending()
-        #         time.sleep(1)
-
-        # except KeyboardInterrupt:
-
-        #     query_end_timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
-            
-        #     logger.info('Generating plot...')
-
-        #     params = (query_start_timestamp, query_end_timestamp, 'pv')            
-        #     process_values = db_cursor.execute('''SELECT timestamp, value
-        #                                           FROM data WHERE timestamp BETWEEN ? AND ? AND
-        #                                           tag_name = ?''', params).fetchall()
-            
-        #     for row in process_values:             
-        #         dates.append(matplotlib.dates.datestr2num(row[0]))
-        #         values.append(row[1])
-
-        #     params = (query_start_timestamp, query_end_timestamp, r'%set%')
-        #     setpoints = db_cursor.execute('''SELECT tag_name, MAX(value)
-        #                                      FROM data
-        #                                      WHERE timestamp BETWEEN ? AND ? AND
-        #                                      tag_name LIKE ?
-        #                                      GROUP BY tag_name
-        #                                      ORDER BY tag_name''', params).fetchall()
-
-        #     date_formatter = matplotlib.dates.DateFormatter('%H:%M:%S')
-        #     minute_locator = matplotlib.dates.MinuteLocator(interval=5)
-
-        #     fig, ax = plt.subplots()
-
-        #     # Plotting the process value data
-        #     ax.plot(dates, values, marker='.', label='Temp.')
-
-        #     ax.set_title('P1I 115.03:Temp.')
-        #     ax.grid(color='b', linewidth=0.2)
-        #     ax.set_xlabel('Time')
-        #     ax.set_ylabel('°C')
-
-        #     ax.xaxis.set_major_formatter(date_formatter)
-        #     ax.xaxis.set_major_locator(minute_locator)
-
-        #     # Obtaining setpoints values from tuples (tag_name, value)
-        #     set_hh, set_h, set_l, set_ll = [t[1] for t in setpoints]
-
-        #     # Setting offsets in order to see the HH and LL setpoints
-        #     if set_hh > 0:
-        #         h_limit = set_hh + (set_hh/4)
-        #     else:
-        #         h_limit = set_hh - (set_hh/4)
-
-        #     if set_ll > 0:
-        #         l_limit = set_ll - (set_hh/4)
-        #     else:
-        #         l_limit = set_ll + (set_hh/4)
-
-        #     # Setting the Y ticks
-        #     ax.set_yticks(np.arange(l_limit, h_limit, Y_TICK_STEP)) 
-
-        #     # Getting the start timestamp and end timestamp
-        #     plot_start_timestamp = dates[0]
-        #     plot_end_timestamp = dates[-1]
-
-        #     # Plotting horizontal lines (setpoints)
-        #     # axhline
-        #     ax.hlines(y=set_hh, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='r', label='Set HH')
-        #     ax.hlines(y=set_h, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='g', label='Set H')
-        #     ax.hlines(y=set_l, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='c', label='Set L')
-        #     ax.hlines(y=set_ll, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='m', label='Set LL')
-        #     ax.legend(title='Legenda').get_title().set_fontstyle = 'italic'
-
-        #     logger.info('Exporting plot...')
-
-        #     # plt.show()
-        #     plt.savefig('.\export.png')
-
-        #     logger.info('Done :)')
-
-        # finally:    
-        #     db_cursor.close()
-        #     client.disconnect()
