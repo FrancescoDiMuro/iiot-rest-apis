@@ -64,8 +64,8 @@ if db_engine is not None:
 
     with Session() as session:
 
-        query_start_timestamp = '20230806T140000'
-        query_end_timestamp = '20230806T143000'
+        query_start_timestamp = '20230806T180000'
+        query_end_timestamp = '20230806T183000'
 
         sql_statement = sqlalchemy.select(
                         Tags.name, 
@@ -109,8 +109,7 @@ if db_engine is not None:
         for row in data:
             setpoints.append(row.value)
 
-        print(setpoints)
-
+        # Add selecting information from tag (description, limits and egu)
 
     logger.info('Generating plot...')
 
@@ -147,7 +146,7 @@ else:
 # Setting the Y ticks
 ax.set_yticks(np.arange(l_limit, h_limit, Y_TICK_STEP)) 
 
-# # Getting the start timestamp and end timestamp
+# Getting the start timestamp and end timestamp
 plot_start_timestamp = dates[0]
 plot_end_timestamp = dates[-1]
 
@@ -157,11 +156,11 @@ ax.hlines(y=set_hh, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='
 ax.hlines(y=set_h, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='g', label='Set H')
 ax.hlines(y=set_l, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='c', label='Set L')
 ax.hlines(y=set_ll, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='m', label='Set LL')
-ax.legend(title='Legenda').get_title().set_fontstyle = 'italic'
+ax.legend(title='Legend').get_title().set_fontstyle = 'italic'
 
 logger.info('Exporting plot...')
 
 # plt.show()
-plt.savefig('.\export.png')
+plt.savefig('./rest-apis/export.png')
 
 logger.info('Done :)')
