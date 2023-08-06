@@ -31,8 +31,7 @@ def initialize_logger() -> logging.Logger:
     logging_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     stream_handler.setFormatter(logging_formatter)
-
-    # add ch to logger
+ 
     logger.addHandler(stream_handler)
 
     return logger
@@ -41,9 +40,10 @@ def initialize_logger() -> logging.Logger:
 def db_connect() -> sqlalchemy.Engine | None:
     DB_TYPE: str = 'sqlite'
     DB_API: str = 'pysqlite'
-    DB_RELATIVE_FILE_PATH: str = '/data.db'
-    DB_CONNECTION_STRING: str = f'{DB_TYPE}+{DB_API}://{DB_RELATIVE_FILE_PATH}'
+    DB_RELATIVE_FILE_PATH: str = 'database/data.db'
+    DB_CONNECTION_STRING: str = f'{DB_TYPE}+{DB_API}:///{DB_RELATIVE_FILE_PATH}'
 
+    # Create the SQLAlchemy engine and metadata (if it doesn't exist)
     engine: sqlalchemy.Engine = sqlalchemy.create_engine(DB_CONNECTION_STRING, echo=True)
     Base.metadata.create_all(bind=engine)
 
@@ -55,6 +55,26 @@ def plc_connect(plc_ip_address: int, plc_rack: int = 0, plc_slot: int = 0, plc_p
     client.connect(plc_ip_address, plc_rack, plc_slot, plc_port)
 
     return client if client.get_connected() else None
+
+
+def load_tags(db_session: Session, sql_statement: sqlalchemy.Select) -> List[Dict[Dict[str, int]]]:
+    
+    TAG_ADDRESS_PATTERN: str = r'^DB(?P<db_number>[^@]+)@(?P<start>[^-]+)\-\>(?P<size>\d+)$'
+    result: list = []
+    rows = session.execute(statement=sql_statement).all()
+    for row in rows:
+        db_number, start, size = findall(TAG_ADDRESS_PATTERN, row.address)[0]               
+        tag = {
+                row.id: {
+                    'db_number': int(db_number),
+                    'start': int(start),
+                    'size': int(size)
+                }
+                }
+        
+        result.append(tag)
+
+    return result
 
 
 def read_data_from_plc(client: snap7.client.Client, tags: Dict[str, Dict[str, str]]) -> List[tuple]:
@@ -110,20 +130,10 @@ PLC_RACK: int = 0
 PLC_SLOT: int = 1
 PLC_PORT: int = 102
 
-EVERY_FIVE_MINUTES: int = 300
-Y_TICK_STEP: int = 10
-
-TAG_ADDRESS_PATTERN: str = r'^DB(?P<db_number>[^@]+)@(?P<start>[^-]+)\-\>(?P<size>\d+)$'
-
 # Tags' lists
 tags_one_minute: List[Tags] = []
 tags_five_minutes: List[Tags] = []
 
-process_values: list = []
-setpoints: list = []
-
-dates: list = []
-values: list = []
 
 logger = initialize_logger()
     
@@ -146,34 +156,14 @@ if db_engine is not None:
             # Tags one minute
             sql_statement = sqlalchemy.select(Tags.id, Tags.address).where(Tags.collection_interval == '1 min'). \
                             order_by(Tags.id)
-            rows = session.execute(statement=sql_statement).all()
-            for row in rows:
-                db_number, start, size = findall(TAG_ADDRESS_PATTERN, row.address)[0]               
-                tag = {
-                        row.id: {
-                            'db_number': int(db_number),
-                            'start': int(start),
-                            'size': int(size)
-                        }
-                      }
-                
-                tags_one_minute.append(tag)             
+            
+            tags_one_minute = load_tags(session, sql_statement)
 
             # Tags five minutes
             sql_statement = sqlalchemy.select(Tags.id, Tags.address).where(Tags.collection_interval == '5 min'). \
                             order_by(Tags.id)
-            rows = session.execute(statement=sql_statement).all()
-            for row in rows:
-                db_number, start, size = findall(TAG_ADDRESS_PATTERN, row.address)[0]               
-                tag = {
-                        row.id: {
-                            'db_number': int(db_number),
-                            'start': int(start),
-                            'size': int(size)
-                        }
-                      }
-                
-                tags_five_minutes.append(tag)   
+            
+            tags_one_minute = load_tags(session, sql_statement)
             
             schedule.every().minute.do(store_data_every_minute, client, tags_one_minute, session)
             schedule.every(5).minutes.do(store_data_every_five_minutes, client, tags_five_minutes, session)
