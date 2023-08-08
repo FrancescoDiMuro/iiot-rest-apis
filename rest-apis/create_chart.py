@@ -11,6 +11,7 @@ sys.path.append(os.getcwd())
 
 from database.models import Data, Tags
 from sqlalchemy.orm import sessionmaker
+from typing import Dict
 
 
 def initialize_logger() -> logging.Logger:
@@ -44,15 +45,16 @@ def db_connect() -> sqlalchemy.Engine | None:
     return engine if isinstance(engine, sqlalchemy.Engine) else None
 
 
-EVERY_FIVE_MINUTES: int = 300
-Y_TICK_STEP: int = 10
-
 process_values: list = []
 setpoints: list = []
 
 dates: list = []
 values: list = []
 
+tag_info: Dict[str, str]
+
+
+# Logger initialization
 logger = initialize_logger()
 
 # Connection with DB
@@ -64,8 +66,8 @@ if db_engine is not None:
 
     with Session() as session:
 
-        query_start_timestamp = '20230806T180000'
-        query_end_timestamp = '20230806T183000'
+        query_start_timestamp = '2023-08-08T14:00:00'
+        query_end_timestamp = '2023-08-08T15:00:00'
 
         sql_statement = sqlalchemy.select(
                         Tags.name, 
@@ -75,9 +77,10 @@ if db_engine is not None:
                         .where(
                             sqlalchemy.and_(
                                 Tags.name.like('%-PV'),
-                                sqlalchemy.between(Data.timestamp, 
-                                                   query_start_timestamp, 
-                                                   query_end_timestamp),
+                                sqlalchemy.between(
+                                    Data.timestamp, 
+                                    query_start_timestamp, 
+                                    query_end_timestamp),
                             )
                         ) \
                         .order_by(Data.timestamp)
@@ -96,9 +99,10 @@ if db_engine is not None:
                         .where(
                             sqlalchemy.and_(
                                 Tags.name.like('%-SET-%'),
-                                sqlalchemy.between(Data.timestamp, 
-                                                   query_start_timestamp, 
-                                                   query_end_timestamp),
+                                sqlalchemy.between(
+                                    Data.timestamp, 
+                                    query_start_timestamp, 
+                                    query_end_timestamp),
                             )
                         ) \
                         .group_by(Tags.name) \
@@ -109,7 +113,16 @@ if db_engine is not None:
         for row in data:
             setpoints.append(row.value)
 
-        # Add selecting information from tag (description, limits and egu)
+        sql_statement = sqlalchemy.select(
+                        Tags.description, 
+                        Tags.low_limit, 
+                        Tags.high_limit, 
+                        Tags.egu) \
+                        .where(Tags.name.like('%-PV'))
+        
+        data = session.execute(sql_statement).one()
+
+        tag_description, tag_low_limit, tag_high_limit, tag_egu = data
 
     logger.info('Generating plot...')
 
@@ -119,12 +132,12 @@ if db_engine is not None:
     fig, ax = plt.subplots()
 
 # Plotting the process value data
-ax.plot(dates, values, marker='.', label='Temp.')
+ax.plot(dates, values, label='PV') # marker='.'
 
-ax.set_title('P1I 115.03:Temp.')
+ax.set_title(tag_description).set_fontweight('bold')
 ax.grid(color='b', linewidth=0.2)
 ax.set_xlabel('Time')
-ax.set_ylabel('°C')
+ax.set_ylabel(tag_egu)
 
 ax.xaxis.set_major_formatter(date_formatter)
 ax.xaxis.set_major_locator(minute_locator)
@@ -132,19 +145,8 @@ ax.xaxis.set_major_locator(minute_locator)
 # Obtaining setpoints values from tuples (tag_name, value)
 set_hh, set_h, set_l, set_ll = setpoints
 
-# Setting offsets in order to see the HH and LL setpoints
-if set_hh > 0:
-    h_limit = set_hh + (set_hh/4)
-else:
-    h_limit = set_hh - (set_hh/4)
-
-if set_ll > 0:
-    l_limit = set_ll - (set_hh/4)
-else:
-    l_limit = set_ll + (set_hh/4)
-
 # Setting the Y ticks
-ax.set_yticks(np.arange(l_limit, h_limit, Y_TICK_STEP)) 
+ax.set_ylim([tag_low_limit, tag_high_limit])
 
 # Getting the start timestamp and end timestamp
 plot_start_timestamp = dates[0]
@@ -156,7 +158,9 @@ ax.hlines(y=set_hh, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='
 ax.hlines(y=set_h, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='g', label='Set H')
 ax.hlines(y=set_l, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='c', label='Set L')
 ax.hlines(y=set_ll, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='m', label='Set LL')
-ax.legend(title='Legend').get_title().set_fontstyle = 'italic'
+ax.legend(ncols=3, loc='lower left')
+
+fig.autofmt_xdate()
 
 logger.info('Exporting plot...')
 

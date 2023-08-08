@@ -57,11 +57,11 @@ def plc_connect(plc_ip_address: int, plc_rack: int = 0, plc_slot: int = 0, plc_p
     return client if client.get_connected() else None
 
 
-def load_tags(db_session: Session, sql_statement: sqlalchemy.Select) -> List[Dict[Dict[str, int]]]:
+def load_tags(db_session: Session, sql_statement: sqlalchemy.Select) -> List[Dict[str, Dict[str, int]]]:
     
     TAG_ADDRESS_PATTERN: str = r'^DB(?P<db_number>[^@]+)@(?P<start>[^-]+)\-\>(?P<size>\d+)$'
     result: list = []
-    rows = session.execute(statement=sql_statement).all()
+    rows = db_session.execute(statement=sql_statement).all()
     for row in rows:
         db_number, start, size = findall(TAG_ADDRESS_PATTERN, row.address)[0]               
         tag = {
@@ -83,7 +83,7 @@ def read_data_from_plc(client: snap7.client.Client, tags: Dict[str, Dict[str, st
 
     for tag in tags:
         for tag_id, tag_fields in tag.items():
-            timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
+            timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
             value = round(get_real(client.db_read(**tag_fields), 0), 2)
             data.append((timestamp, value, tag_id))
 
@@ -131,10 +131,10 @@ PLC_SLOT: int = 1
 PLC_PORT: int = 102
 
 # Tags' lists
-tags_one_minute: List[Tags] = []
-tags_five_minutes: List[Tags] = []
+tags_one_minute: List[Dict[str, Dict[str, int]]] = []
+tags_five_minutes: List[Dict[str, Dict[str, int]]] = []
 
-
+# Logger initialization
 logger = initialize_logger()
     
 # Connection with DB
@@ -142,6 +142,7 @@ db_engine = db_connect()
 if db_engine is not None:
     logger.info('Connection with DB -> OK')
 
+    # Create Session
     Session = sessionmaker(bind=db_engine)     
     
     # Connection with PLC
@@ -154,24 +155,33 @@ if db_engine is not None:
         with Session() as session:
 
             # Tags one minute
-            sql_statement = sqlalchemy.select(Tags.id, Tags.address).where(Tags.collection_interval == '1 min'). \
-                            order_by(Tags.id)
+            sql_statement = sqlalchemy.select(
+                            Tags.id, Tags.address) \
+                            .where(Tags.collection_interval == '1 min') \
+                            .order_by(Tags.id)
             
             tags_one_minute = load_tags(session, sql_statement)
 
             # Tags five minutes
-            sql_statement = sqlalchemy.select(Tags.id, Tags.address).where(Tags.collection_interval == '5 min'). \
-                            order_by(Tags.id)
+            sql_statement = sqlalchemy.select(
+                            Tags.id, Tags.address) \
+                            .where(Tags.collection_interval == '5 min') \
+                            .order_by(Tags.id)
             
-            tags_one_minute = load_tags(session, sql_statement)
+            tags_five_minutes = load_tags(session, sql_statement)
             
+            # Trigger one-time storing of data before the scheduling
+            store_data_every_minute(client, tags_one_minute, session)
+            store_data_every_five_minutes(client, tags_five_minutes, session)
+            
+            # Schedules
             schedule.every().minute.do(store_data_every_minute, client, tags_one_minute, session)
             schedule.every(5).minutes.do(store_data_every_five_minutes, client, tags_five_minutes, session)
 
             while 1:
                 try:
                     schedule.run_pending()
-                    time.sleep(1)
+                    time.sleep(0.25)
                 except KeyboardInterrupt:
-                    print('Collection stopped by user.')
+                    logger.info('Collection stopped by user.')
                     quit()
