@@ -4,6 +4,7 @@ import os.path
 import snap7
 import schedule
 import time
+import threading
 from datetime import datetime
 from snap7.util import get_real
 from typing import Dict, List, Union
@@ -124,6 +125,11 @@ def store_data_every_five_minutes(client: snap7.client.Client, tags: Dict[str, D
     return True
 
 
+# def run_threaded(job_func, *job_args):
+#     job_thread = threading.Thread(target=job_func, args=job_args)
+#     job_thread.start()
+
+
 # Start application
 PLC_IP_ADDRESS: str = '10.149.23.65'
 PLC_RACK: int = 0
@@ -175,6 +181,8 @@ if db_engine is not None:
             store_data_every_five_minutes(client, tags_five_minutes, session)
             
             # Schedules
+            # schedule.every().minute.do(run_threaded, store_data_every_minute, client, tags_one_minute, session)
+            # schedule.every(5).minutes.do(run_threaded, store_data_every_five_minutes, client, tags_five_minutes, session)
             schedule.every().minute.do(store_data_every_minute, client, tags_one_minute, session)
             schedule.every(5).minutes.do(store_data_every_five_minutes, client, tags_five_minutes, session)
 

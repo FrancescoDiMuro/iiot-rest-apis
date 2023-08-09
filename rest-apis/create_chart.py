@@ -1,7 +1,6 @@
 import logging
 import matplotlib.pyplot as plt
 import matplotlib.dates
-import numpy as np
 import os
 import sqlalchemy
 import sqlalchemy.sql.functions as sqlfuncs
@@ -66,8 +65,8 @@ if db_engine is not None:
 
     with Session() as session:
 
-        query_start_timestamp = '2023-08-08T14:00:00'
-        query_end_timestamp = '2023-08-08T15:00:00'
+        query_start_timestamp = '2023-08-08T00:00:00'
+        query_end_timestamp = '2023-08-09T00:00:00'
 
         sql_statement = sqlalchemy.select(
                         Tags.name, 
@@ -86,10 +85,12 @@ if db_engine is not None:
                         .order_by(Data.timestamp)
         
         data = session.execute(sql_statement)
+        # table_data = []
 
         for row in data:
             dates.append(matplotlib.dates.datestr2num(row.timestamp))
             values.append(row.value)
+            # table_data.append([row.timestamp, row.value])
 
         sql_statement = sqlalchemy.select(
                         Tags.name, 
@@ -127,7 +128,7 @@ if db_engine is not None:
     logger.info('Generating plot...')
 
     date_formatter = matplotlib.dates.DateFormatter('%H:%M:%S')
-    minute_locator = matplotlib.dates.MinuteLocator(interval=5)
+    minute_locator = matplotlib.dates.MinuteLocator(interval=60)
 
     fig, ax = plt.subplots()
 
@@ -159,6 +160,8 @@ ax.hlines(y=set_h, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='g
 ax.hlines(y=set_l, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='c', label='Set L')
 ax.hlines(y=set_ll, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='m', label='Set LL')
 ax.legend(ncols=3, loc='lower left')
+
+# ax.table(cellText=table_data)
 
 fig.autofmt_xdate()
 
