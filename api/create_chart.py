@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 import sys
 
 WORKING_DIR: str = os.getcwd()
+print(f'{WORKING_DIR=}')
 
 if WORKING_DIR not in sys.path:
     sys.path.append(WORKING_DIR)

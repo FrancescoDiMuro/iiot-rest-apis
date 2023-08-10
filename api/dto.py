@@ -12,4 +12,4 @@ class Tags(BaseModel):
     egu: str
     created_at: str
     updated_at: str
-    deleted_at: str
+    deleted_at: str | None = None
