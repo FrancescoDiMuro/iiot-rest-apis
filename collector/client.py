@@ -1,21 +1,23 @@
 import logging
-from os import getcwd
-import os.path
+import os
 import snap7
 import schedule
-import time
-import threading
+import sqlalchemy
+
 from datetime import datetime
-from snap7.util import get_real
-from typing import Dict, List, Union
 from re import findall
+from snap7.util import get_real
+from sqlalchemy.orm import Session, sessionmaker
+from time import sleep
+from typing import Dict, List, Union
 
 import sys
 
-sys.path.append(getcwd())
+WORKING_DIR: str = os.getcwd()
 
-import sqlalchemy
-from sqlalchemy.orm import Session, sessionmaker
+if WORKING_DIR not in sys.path:
+    sys.path.append(WORKING_DIR)
+
 from database.models import Base, Tags, Data
 
 
@@ -51,17 +53,19 @@ def db_connect() -> sqlalchemy.Engine | None:
     return engine if isinstance(engine, sqlalchemy.Engine) else None
 
     
-def plc_connect(plc_ip_address: int, plc_rack: int = 0, plc_slot: int = 0, plc_port: int = 102) -> snap7.client.Client | None:
+def plc_connect(plc_ip_address: int, plc_rack: int = 0, 
+                plc_slot: int = 0, plc_port: int = 102) -> snap7.client.Client | None:
+    
     client = snap7.client.Client()
     client.connect(plc_ip_address, plc_rack, plc_slot, plc_port)
 
     return client if client.get_connected() else None
 
 
-def load_tags(db_session: Session, sql_statement: sqlalchemy.Select) -> List[Dict[str, Dict[str, int]]]:
+def load_tags(db_session: Session, sql_statement: sqlalchemy.Select) -> List[Dict[str, Dict[str, int]]]:    
     
     TAG_ADDRESS_PATTERN: str = r'^DB(?P<db_number>[^@]+)@(?P<start>[^-]+)\-\>(?P<size>\d+)$'
-    result: list = []
+    tags: list = []
     rows = db_session.execute(statement=sql_statement).all()
     for row in rows:
         db_number, start, size = findall(TAG_ADDRESS_PATTERN, row.address)[0]               
@@ -71,17 +75,17 @@ def load_tags(db_session: Session, sql_statement: sqlalchemy.Select) -> List[Dic
                     'start': int(start),
                     'size': int(size)
                 }
-                }
+        }
         
-        result.append(tag)
+        tags.append(tag)
 
-    return result
+    return tags
 
 
 def read_data_from_plc(client: snap7.client.Client, tags: Dict[str, Dict[str, str]]) -> List[tuple]:
+    
     data: List[Dict[str, Union[str, float]]] = []
     
-
     for tag in tags:
         for tag_id, tag_fields in tag.items():
             timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
@@ -123,11 +127,6 @@ def store_data_every_five_minutes(client: snap7.client.Client, tags: Dict[str, D
 
     logger.info('store_data_every_five_minutes -> OK')
     return True
-
-
-# def run_threaded(job_func, *job_args):
-#     job_thread = threading.Thread(target=job_func, args=job_args)
-#     job_thread.start()
 
 
 # Start application
@@ -180,16 +179,14 @@ if db_engine is not None:
             store_data_every_minute(client, tags_one_minute, session)
             store_data_every_five_minutes(client, tags_five_minutes, session)
             
-            # Schedules
-            # schedule.every().minute.do(run_threaded, store_data_every_minute, client, tags_one_minute, session)
-            # schedule.every(5).minutes.do(run_threaded, store_data_every_five_minutes, client, tags_five_minutes, session)
+            # Schedulers
             schedule.every().minute.do(store_data_every_minute, client, tags_one_minute, session)
             schedule.every(5).minutes.do(store_data_every_five_minutes, client, tags_five_minutes, session)
 
             while 1:
                 try:
                     schedule.run_pending()
-                    time.sleep(0.25)
+                    sleep(0.25)
                 except KeyboardInterrupt:
                     logger.info('Collection stopped by user.')
                     quit()

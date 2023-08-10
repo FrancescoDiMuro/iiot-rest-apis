@@ -1,16 +1,21 @@
+import datetime
 import logging
 import matplotlib.pyplot as plt
 import matplotlib.dates
 import os
 import sqlalchemy
 import sqlalchemy.sql.functions as sqlfuncs
+
+from sqlalchemy.orm import sessionmaker
+
 import sys
 
-sys.path.append(os.getcwd())
+WORKING_DIR: str = os.getcwd()
+
+if WORKING_DIR not in sys.path:
+    sys.path.append(WORKING_DIR)
 
 from database.models import Data, Tags
-from sqlalchemy.orm import sessionmaker
-from typing import Dict
 
 
 def initialize_logger() -> logging.Logger:
@@ -27,7 +32,6 @@ def initialize_logger() -> logging.Logger:
 
     stream_handler.setFormatter(logging_formatter)
 
-    # add ch to logger
     logger.addHandler(stream_handler)
 
     return logger
@@ -50,10 +54,8 @@ setpoints: list = []
 dates: list = []
 values: list = []
 
-tag_info: Dict[str, str]
 
-
-# Logger initialization
+# Start application
 logger = initialize_logger()
 
 # Connection with DB
@@ -65,8 +67,9 @@ if db_engine is not None:
 
     with Session() as session:
 
-        query_start_timestamp = '2023-08-08T00:00:00'
-        query_end_timestamp = '2023-08-09T00:00:00'
+        # Query time range
+        query_start_timestamp = '2023-08-10T09:00:00'
+        query_end_timestamp = '2023-08-10T10:00:00'
 
         sql_statement = sqlalchemy.select(
                         Tags.name, 
@@ -85,12 +88,10 @@ if db_engine is not None:
                         .order_by(Data.timestamp)
         
         data = session.execute(sql_statement)
-        # table_data = []
 
         for row in data:
             dates.append(matplotlib.dates.datestr2num(row.timestamp))
             values.append(row.value)
-            # table_data.append([row.timestamp, row.value])
 
         sql_statement = sqlalchemy.select(
                         Tags.name, 
@@ -126,9 +127,16 @@ if db_engine is not None:
         tag_description, tag_low_limit, tag_high_limit, tag_egu = data
 
     logger.info('Generating plot...')
+    
+    time_delta: datetime.timedelta = datetime.datetime.strptime(query_end_timestamp, '%Y-%m-%dT%H:%M:%S') - \
+                datetime.datetime.strptime(query_start_timestamp, '%Y-%m-%dT%H:%M:%S')
+    
+    
+    
+    timestamp_format = '%H:%M' if time_delta.days > 1 else '%d/%m %H:%M'    
 
-    date_formatter = matplotlib.dates.DateFormatter('%H:%M:%S')
-    minute_locator = matplotlib.dates.MinuteLocator(interval=60)
+    date_formatter = matplotlib.dates.DateFormatter(timestamp_format)
+    major_locator = matplotlib.dates.AutoDateLocator()
 
     fig, ax = plt.subplots()
 
@@ -141,7 +149,7 @@ ax.set_xlabel('Time')
 ax.set_ylabel(tag_egu)
 
 ax.xaxis.set_major_formatter(date_formatter)
-ax.xaxis.set_major_locator(minute_locator)
+ax.xaxis.set_major_locator(major_locator)
 
 # Obtaining setpoints values from tuples (tag_name, value)
 set_hh, set_h, set_l, set_ll = setpoints
@@ -154,20 +162,16 @@ plot_start_timestamp = dates[0]
 plot_end_timestamp = dates[-1]
 
 # Plotting horizontal lines (setpoints)
-# axhline
 ax.hlines(y=set_hh, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='r', label='Set HH')
 ax.hlines(y=set_h, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='g', label='Set H')
 ax.hlines(y=set_l, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='c', label='Set L')
 ax.hlines(y=set_ll, xmin=plot_start_timestamp, xmax=plot_end_timestamp, colors='m', label='Set LL')
 ax.legend(ncols=3, loc='lower left')
 
-# ax.table(cellText=table_data)
-
 fig.autofmt_xdate()
 
 logger.info('Exporting plot...')
 
-# plt.show()
 plt.savefig('./rest-apis/export.png')
 
 logger.info('Done :)')
