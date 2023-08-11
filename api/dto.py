@@ -13,3 +13,10 @@ class Tags(BaseModel):
     created_at: str
     updated_at: str
     deleted_at: str | None = None
+
+
+class Data(BaseModel):
+
+    name: str    
+    timestamp: str
+    value: float    

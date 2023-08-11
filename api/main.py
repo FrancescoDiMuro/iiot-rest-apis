@@ -5,16 +5,15 @@ import sqlalchemy.sql.functions as sqlfuncs
 
 import sys
 
-# os.chdir('.\\')
 WORKING_DIR: str = os.getcwd()
 
 if WORKING_DIR not in sys.path:
-    print(f'{WORKING_DIR=}')
     sys.path.append(WORKING_DIR)
 
 import database.models
 import api.dto
 
+from database.utils import db_connect
 from fastapi import FastAPI
 from sqlalchemy.orm import Session, sessionmaker
 from typing import List
@@ -39,23 +38,11 @@ def initialize_logger() -> logging.Logger:
     return logger
 
 
-def db_connect() -> sqlalchemy.Engine | None:
-    DB_TYPE: str = 'sqlite'
-    DB_API: str = 'pysqlite'
-    DB_RELATIVE_FILE_PATH: str = 'database/data.db'
-    DB_CONNECTION_STRING: str = f'{DB_TYPE}+{DB_API}:///{DB_RELATIVE_FILE_PATH}'
-
-    # Create the SQLAlchemy engine and metadata (if it doesn't exist)
-    engine: sqlalchemy.Engine = sqlalchemy.create_engine(DB_CONNECTION_STRING, echo=True)   
-
-    return engine if isinstance(engine, sqlalchemy.Engine) else None
-
-
 # Logger initialization
 logger = initialize_logger()
     
 # Connection with DB
-db_engine = db_connect()
+db_engine = db_connect(create_metadata=False, echo=True)
 if db_engine is not None:
 
     # Create Session
@@ -92,18 +79,19 @@ async def get_tags(name_like: str = '%', description_like: str = '%') -> List[ap
 
 
 @app.get('/data')
-async def get_data(start_time: str = '', end_time: str = '', name_like: str = '%', description_like: str = '%') -> None:
+async def get_data(start_time: str = '', end_time: str = '', name_like: str = '%') -> List[api.dto.Data] | None:
     
+    # Initialization of start_time and end_time in case they are not provided
     if start_time == '' and end_time == '':
         sql_statement = sqlalchemy.select(sqlfuncs.min(database.models.Data.timestamp),
                                           sqlfuncs.max(database.models.Data.timestamp)) \
                                   .order_by(database.models.Data.timestamp.desc())
         
         start_time, end_time = session.execute(sql_statement).all()[0]
-        
-
+                
+    # Selecting data
     sql_statement = sqlalchemy.select(
-                        database.models.Tags.name, 
+                        database.models.Tags.name,                         
                         database.models.Data.timestamp, 
                         database.models.Data.value) \
                         .join(database.models.Tags, database.models.Data.tag_id == database.models.Tags.id) \
@@ -113,6 +101,7 @@ async def get_data(start_time: str = '', end_time: str = '', name_like: str = '%
                                     database.models.Data.timestamp, 
                                     start_time, 
                                     end_time),
+                                database.models.Tags.name.like(name_like)                            
                             )
                         ) \
                         .order_by(database.models.Data.timestamp)
@@ -122,13 +111,6 @@ async def get_data(start_time: str = '', end_time: str = '', name_like: str = '%
     l = []
     
     for row in data:
-        l.append([row.name, row.timestamp, row.value])
+        l.append(api.dto.Data(name=row.name, timestamp=row.timestamp, value=row.value))
 
     return l
-        
-    
-
-    # for tag in tags:
-    #     l.append(api.dto.Tags(**{k:v for k,v in tag.__dict__.items() if not k.startswith('_')}))
-
-    # return l
