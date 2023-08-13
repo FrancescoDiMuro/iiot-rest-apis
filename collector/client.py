@@ -19,24 +19,7 @@ from collector.utils import (plc_connect,
                              store_data_every_five_minutes)
 import database.models
 from database.utils import db_connect, load_tags
-
-def initialize_logger() -> logging.Logger:
-    
-    script_name: str = os.path.split(__file__)[1]
-
-    logger = logging.getLogger(script_name)
-    logger.setLevel(logging.DEBUG)
-    
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.DEBUG)
-
-    logging_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-    stream_handler.setFormatter(logging_formatter)
- 
-    logger.addHandler(stream_handler)
-
-    return logger
+from misc.utils import initialize_logger
 
    
 # Start application
@@ -45,12 +28,14 @@ PLC_RACK: int = 0
 PLC_SLOT: int = 1
 PLC_PORT: int = 102
 
+SCRIPT_NAME: str = os.path.split(__file__)[1]
+
 # Tags' lists
 tags_one_minute: List[Dict[str, Dict[str, int]]] = []
 tags_five_minutes: List[Dict[str, Dict[str, int]]] = []
 
 # Logger initialization
-logger = initialize_logger()
+logger = initialize_logger(SCRIPT_NAME)
     
 # Connection with DB
 db_engine = db_connect(create_metadata=True, echo=False)

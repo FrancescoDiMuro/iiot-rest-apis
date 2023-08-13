@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import sqlalchemy
@@ -14,51 +15,70 @@ import database.models
 import api.dto
 
 from database.utils import db_connect
-from fastapi import FastAPI
+from misc.utils import initialize_logger
+from fastapi import FastAPI, HTTPException
 from sqlalchemy.orm import Session, sessionmaker
 from typing import List
 
 
-def initialize_logger() -> logging.Logger:
-    
-    script_name: str = os.path.split(__file__)[1]
+def validate_period(period: str) -> bool:
 
-    logger = logging.getLogger(script_name)
-    logger.setLevel(logging.DEBUG)
-    
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.DEBUG)
+    VALID_PERIODS: list = [
+        'minutes',
+        'hours',
+        'days',
+        'weeks',
+        'months'
+    ]
 
-    logging_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    unit = period.split('_')[2]
+    unit = f'{unit}s' if not unit.endswith('s') else unit  
 
-    stream_handler.setFormatter(logging_formatter)
- 
-    logger.addHandler(stream_handler)
+    return True if unit in VALID_PERIODS else False       
+        
 
-    return logger
+def calculate_period(period: str) -> tuple:
 
+    TIMESTAMP_FORMAT: str = '%Y-%m-%dT%H:%M:%S'
+
+    _, amount, unit = period.split('_')
+
+    unit = f'{unit}s' if not unit.endswith('s') else unit
+
+    # Taking the now datetime (end_time) and calculating the time previous now based on amount and unit (start_time)
+    end_time = datetime.datetime.now()
+    start_time = end_time - datetime.timedelta(**{unit: int(amount)})
+
+    # Formatting timestamps
+    start_time = start_time.strftime(TIMESTAMP_FORMAT)
+    end_time = end_time.strftime(TIMESTAMP_FORMAT)
+
+    return start_time, end_time
+
+
+SCRIPT_NAME: str = os.path.split(__file__)[1]
 
 # Logger initialization
-logger = initialize_logger()
+logger = initialize_logger(SCRIPT_NAME)
     
 # Connection with DB
 db_engine = db_connect(create_metadata=False, echo=True)
 if db_engine is not None:
 
     # Create Session
-    Session = sessionmaker(bind=db_engine)     
+    Session = sessionmaker(bind=db_engine)
 
-    # with Session.begin() as session:
     with Session() as session:     
-
         app = FastAPI()        
+
 
 @app.get('/')
 async def root():
     return {'message': 'This is the root'}
 
+
 @app.get('/tags')
-async def get_tags(name_like: str = '%', description_like: str = '%') -> List[api.dto.Tags] | None:
+async def get_tags(name_like: str = '%', description_like: str = '%') -> List[api.dto.Tags]:
     
     sql_statement = sqlalchemy.select(database.models.Tags) \
                     .where(sqlalchemy.and_( \
@@ -79,15 +99,14 @@ async def get_tags(name_like: str = '%', description_like: str = '%') -> List[ap
 
 
 @app.get('/data')
-async def get_data(start_time: str = '', end_time: str = '', name_like: str = '%') -> List[api.dto.Data] | None:
+async def get_data(period: str = 'last_1_hour', start_time: str = '', end_time: str = '', name_like: str = '%') -> List[api.dto.Data] | object:
     
-    # Initialization of start_time and end_time in case they are not provided
+    # If the user is not providing any specific time range, then the period is considered   
     if start_time == '' and end_time == '':
-        sql_statement = sqlalchemy.select(sqlfuncs.min(database.models.Data.timestamp),
-                                          sqlfuncs.max(database.models.Data.timestamp)) \
-                                  .order_by(database.models.Data.timestamp.desc())
-        
-        start_time, end_time = session.execute(sql_statement).all()[0]
+        if validate_period(period):
+            start_time, end_time = calculate_period(period)
+        else:
+            raise HTTPException(status_code=422, detail='Invalid period')
                 
     # Selecting data
     sql_statement = sqlalchemy.select(

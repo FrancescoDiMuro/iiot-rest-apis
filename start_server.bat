@@ -1,0 +1,1 @@
+start /b env\Scripts\uvicorn.exe api.main:app --reload
