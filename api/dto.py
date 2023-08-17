@@ -10,8 +10,8 @@ class Tags(BaseModel):
     low_limit: float
     high_limit: float
     egu: str
-    created_at: str
-    updated_at: str
+    created_at: str | None = None
+    updated_at: str | None = None
     deleted_at: str | None = None
 
 
@@ -19,4 +19,5 @@ class Data(BaseModel):
 
     name: str    
     timestamp: str
-    value: float    
+    value: float
+    

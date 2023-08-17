@@ -74,7 +74,7 @@ if db_engine is not None:
                                 Tags.name.like('%-SET-%'),
                                 sqlalchemy.between(
                                     Data.timestamp, 
-                                    query_start_timestamp, 
+                                    query_start_timestamp,
                                     query_end_timestamp),
                             )
                         ) \
@@ -104,7 +104,7 @@ if db_engine is not None:
     
     
     
-    timestamp_format = '%H:%M' if time_delta.days > 1 else '%d/%m %H:%M'    
+    timestamp_format = '%H:%M' if time_delta.days > 1 else '%d/%m %H:%M'
 
     date_formatter = matplotlib.dates.DateFormatter(timestamp_format)
     major_locator = matplotlib.dates.AutoDateLocator()

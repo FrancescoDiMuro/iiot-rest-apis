@@ -1,0 +1,62 @@
+[
+    {
+        "name": "SYSTEM2-PROBE1-PV",
+        "description": "SYSTEM2:PROBE1 PV",
+        "address": "DB404@48->4",
+        "collection_interval": "1 min",
+        "low_limit": "-40",
+        "high_limit": "0",
+        "egu": "\u00b0C",
+        "created_at": "",
+        "updated_at": "",
+        "deleted_at": ""
+    },
+    {
+        "name": "SYSTEM2-PROBE1-SET-LL",
+        "description": "SYSTEM2:PROBE1 SET-LL",
+        "address": "DB404@32->4",
+        "collection_interval": "5 min",
+        "low_limit": "0",
+        "high_limit": "3600",
+        "egu": "sec",
+        "created_at": "",
+        "updated_at": "",
+        "deleted_at": ""
+    },
+    {
+        "name": "SYSTEM2-PROBE1-SET-L",
+        "description": "SYSTEM2:PROBE1 SET-L",
+        "address": "DB404@36->4",
+        "collection_interval": "5 min",
+        "low_limit": "0",
+        "high_limit": "3600",
+        "egu": "sec",
+        "created_at": "",
+        "updated_at": "",
+        "deleted_at": ""
+    },
+    {
+        "name": "SYSTEM2-PROBE1-SET-H",
+        "description": "SYSTEM2:PROBE1 SET-H",
+        "address": "DB404@40->4",
+        "collection_interval": "5 min",
+        "low_limit": "0",
+        "high_limit": "3600",
+        "egu": "sec",
+        "created_at": "",
+        "updated_at": "",
+        "deleted_at": ""
+    },
+    {
+        "name": "SYSTEM2-PROBE1-SET-HH",
+        "description": "SYSTEM2:PROBE1 SET-HH",
+        "address": "DB404@44->4",
+        "collection_interval": "5 min",
+        "low_limit": "0",
+        "high_limit": "3600",
+        "egu": "sec",
+        "created_at": "",
+        "updated_at": "",
+        "deleted_at": ""
+    }
+]

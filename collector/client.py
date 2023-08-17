@@ -1,4 +1,3 @@
-import logging
 import os
 import schedule
 import sqlalchemy
@@ -14,9 +13,7 @@ WORKING_DIR: str = os.getcwd()
 if WORKING_DIR not in sys.path:
     sys.path.append(WORKING_DIR)
 
-from collector.utils import (plc_connect, 
-                             store_data_every_minute, 
-                             store_data_every_five_minutes)
+from collector.utils import plc_connect, store_data
 import database.models
 from database.utils import db_connect, load_tags
 from misc.utils import initialize_logger
@@ -38,24 +35,25 @@ tags_five_minutes: List[Dict[str, Dict[str, int]]] = []
 logger = initialize_logger(SCRIPT_NAME)
     
 # Connection with DB
-db_engine = db_connect(create_metadata=True, echo=False)
-if db_engine is not None:
+engine = db_connect(create_metadata=True, echo=False)
+if engine is not None:
     logger.info('Connection with DB -> OK')
 
     # Create Session
-    Session = sessionmaker(bind=db_engine)
+    Session = sessionmaker(bind=engine)
 
     # Connection with PLC
     client = plc_connect(PLC_IP_ADDRESS, PLC_RACK, PLC_SLOT, PLC_PORT)
     if client is not None:
 
-        logger.info('Connection with PLC -> OK')        
+        logger.info('Connection with PLC -> OK')
 
         with Session() as session:
 
             # Tags one minute
             sql_statement = sqlalchemy.select(
-                            database.models.Tags.id, database.models.Tags.address) \
+                                database.models.Tags.id, 
+                                database.models.Tags.address) \
                             .where(sqlalchemy.and_(
                                 database.models.Tags.collection_interval == '1 min',
                                 database.models.Tags.deleted_at.is_(None))) \
@@ -65,7 +63,8 @@ if db_engine is not None:
 
             # Tags five minutes
             sql_statement = sqlalchemy.select(
-                            database.models.Tags.id, database.models.Tags.address) \
+                                database.models.Tags.id, 
+                                database.models.Tags.address) \
                             .where(sqlalchemy.and_(
                                 database.models.Tags.collection_interval == '5 min',
                                 database.models.Tags.deleted_at .is_(None))) \
@@ -73,13 +72,13 @@ if db_engine is not None:
             
             tags_five_minutes = load_tags(session, sql_statement)
             
-            # Trigger one-time storing of data before the scheduling
-            store_data_every_minute(client, tags_one_minute, session, logger)
-            store_data_every_five_minutes(client, tags_five_minutes, session, logger)
+            # Trigger one-time storing data before the scheduling
+            store_data(client, tags_one_minute, session, logger, '1 min')
+            store_data(client, tags_five_minutes, session, logger, '5 min')
             
             # Schedulers
-            schedule.every().minute.do(store_data_every_minute, client, tags_one_minute, session, logger)
-            schedule.every(5).minutes.do(store_data_every_five_minutes, client, tags_five_minutes, session, logger)
+            schedule.every().minute.do(store_data, client, tags_one_minute, session, logger, '1 min')
+            schedule.every(5).minutes.do(store_data, client, tags_five_minutes, session, logger, '5 min')
 
             while 1:
                 try:
@@ -87,4 +86,5 @@ if db_engine is not None:
                     sleep(0.25)
                 except KeyboardInterrupt:
                     logger.info('Collection stopped by user.')
+                    session.close()
                     quit()

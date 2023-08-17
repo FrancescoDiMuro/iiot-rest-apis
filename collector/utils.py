@@ -4,6 +4,7 @@ import snap7
 from datetime import datetime
 from logging import Logger
 from snap7.util import get_real
+from sqlalchemy import insert
 from sqlalchemy.orm import Session
 from typing import List, Dict, Union
 
@@ -19,6 +20,19 @@ from database.models import Data
 def plc_connect(plc_ip_address: str, plc_rack: int = 0, 
                 plc_slot: int = 0, plc_port: int = 102) -> snap7.client.Client | None:
     
+    '''Connects with the specified PLC.
+    
+    Arguments:
+     - plc_ip_address (str): IP address of the PLC
+     - plc_rack (int): rack number where the PLC is located
+     - plc_slot (int): slot number where the PLC is located
+     - plc_port (int): port number used to connect to the PLC
+
+    Returns:
+     - 'snap7.client.Client' in case of success
+     - 'None' in case of failure
+    '''
+    
     client = snap7.client.Client()
     client.connect(plc_ip_address, plc_rack, plc_slot, plc_port)
 
@@ -26,6 +40,16 @@ def plc_connect(plc_ip_address: str, plc_rack: int = 0,
 
 
 def read_data_from_plc(client: snap7.client.Client, tags: Dict[str, Dict[str, str]]) -> List[tuple]:
+    
+    '''Reads data from specified PLC.
+    
+    Arguments:
+     - client (snap7.client.Client): client instance of the connected PLC
+     - tags (Dict[str, Dict[str, str]]): dictionary of tags (dictionaries)
+
+    Returns:
+     - 'List[tuple]' in case of success
+    '''
     
     data: List[Dict[str, Union[str, float]]] = []
     
@@ -38,37 +62,37 @@ def read_data_from_plc(client: snap7.client.Client, tags: Dict[str, Dict[str, st
     return data
 
 
-def store_data_every_minute(client: snap7.client.Client, tags: Dict[str, Dict[str, int]], 
-                            db_session: Session, logger: Logger) -> bool:
+def store_data(client: snap7.client.Client, tags: Dict[str, Dict[str, int]], 
+               session: Session, logger: Logger, tags_collection_interval: str = '') -> bool:
+    
+    '''Store data into the database.
+    
+    Arguments:
+     - client (snap7.client.Client): client instance of the connected PLC
+     - tags (Dict[str, Dict[str, str]]): dictionary of tags (dictionaries)
+     - session (sqlalchemy.orm.Session): session used to commit transactions to db
+     - tags_collection_interval (str): collection interval of the tags passed to the function
+
+    Returns:
+     - 'bool' in case of success
+    '''
+    
     
     data = read_data_from_plc(client, tags)
     records: list = []
     
     for record in data:
         timestamp, value, tag_id = record
-        records.append(Data(timestamp=timestamp, value=value, tag_id=tag_id))
+        records.append({'timestamp': timestamp, 
+                        'value': value, 
+                        'tag_id': tag_id})
+
+    sql_statement = insert(Data).values(records).returning(Data.id)
     
-    db_session.add_all(records)
-    db_session.commit()
-
-    # if data_inserted:
-
-    logger.info('store_data_every_minute -> OK')
-    return True
-
-
-def store_data_every_five_minutes(client: snap7.client.Client, tags: Dict[str, Dict[str, int]], 
-                                  db_session: Session, logger: Logger) -> bool:
+    inserted_rows = session.execute(sql_statement).all()
+    if inserted_rows[-1].id > 0:
+        session.commit()
+        logger.info(f'store_data ({tags_collection_interval}) -> OK')
+        return True
     
-    data = read_data_from_plc(client, tags)
-    records: list = []
-    
-    for record in data:
-        timestamp, value, tag_id = record
-        records.append(Data(timestamp=timestamp, value=value, tag_id=tag_id))
-    
-    db_session.add_all(records)
-    db_session.commit()
-
-    logger.info('store_data_every_five_minutes -> OK')
-    return True
+    return False

@@ -1,5 +1,3 @@
-import datetime
-import logging
 import os
 import sqlalchemy
 import sqlalchemy.sql.functions as sqlfuncs
@@ -15,45 +13,15 @@ import database.models
 import api.dto
 
 from database.utils import db_connect
+from api.utils import (validate_period, calculate_period, 
+                       API_METADATA, 
+                       ROOT_ENDPOINT_METADATA, 
+                       GET_TAGS_ENDPOINT_METADATA, POST_TAGS_ENDPOINT_METADATA, 
+                       GET_DATA_ENDPOINT_METADATA)
 from misc.utils import initialize_logger
 from fastapi import FastAPI, HTTPException
 from sqlalchemy.orm import Session, sessionmaker
 from typing import List
-
-
-def validate_period(period: str) -> bool:
-
-    VALID_PERIODS: list = [
-        'minutes',
-        'hours',
-        'days',
-        'weeks',
-        'months'
-    ]
-
-    unit = period.split('_')[2]
-    unit = f'{unit}s' if not unit.endswith('s') else unit  
-
-    return True if unit in VALID_PERIODS else False       
-        
-
-def calculate_period(period: str) -> tuple:
-
-    TIMESTAMP_FORMAT: str = '%Y-%m-%dT%H:%M:%S'
-
-    _, amount, unit = period.split('_')
-
-    unit = f'{unit}s' if not unit.endswith('s') else unit
-
-    # Taking the now datetime (end_time) and calculating the time previous now based on amount and unit (start_time)
-    end_time = datetime.datetime.now()
-    start_time = end_time - datetime.timedelta(**{unit: int(amount)})
-
-    # Formatting timestamps
-    start_time = start_time.strftime(TIMESTAMP_FORMAT)
-    end_time = end_time.strftime(TIMESTAMP_FORMAT)
-
-    return start_time, end_time
 
 
 SCRIPT_NAME: str = os.path.split(__file__)[1]
@@ -62,22 +30,22 @@ SCRIPT_NAME: str = os.path.split(__file__)[1]
 logger = initialize_logger(SCRIPT_NAME)
     
 # Connection with DB
-db_engine = db_connect(create_metadata=False, echo=True)
+db_engine = db_connect(create_metadata=False, echo=False)
 if db_engine is not None:
 
     # Create Session
     Session = sessionmaker(bind=db_engine)
 
     with Session() as session:     
-        app = FastAPI()        
+        app = FastAPI(**API_METADATA)  
 
 
-@app.get('/')
+@app.get('/', **ROOT_ENDPOINT_METADATA)
 async def root():
     return {'message': 'This is the root'}
 
 
-@app.get('/tags')
+@app.get('/tags', **GET_TAGS_ENDPOINT_METADATA)
 async def get_tags(name_like: str = '%', description_like: str = '%') -> List[api.dto.Tags]:
     
     sql_statement = sqlalchemy.select(database.models.Tags) \
@@ -98,10 +66,31 @@ async def get_tags(name_like: str = '%', description_like: str = '%') -> List[ap
     return l
 
 
-@app.get('/data')
+@app.post('/tags', **POST_TAGS_ENDPOINT_METADATA)
+async def get_tags(tags: List[api.dto.Tags]) -> List[api.dto.Tags]:
+    
+    new_tags: List[database.models.Tags] = []
+
+    for tag in tags:
+        print(tag.__dict__)
+        new_tags.append(database.models.Tags(**{k:v for k,v in tag.__dict__.items()}))
+
+    # print(new_tags)
+
+
+    sql_statement = sqlalchemy.insert(database.models.Tags).values(new_tags).returning(database.models.Tags.id)
+    
+    inserted_rows = session.execute(sql_statement).all()
+    if inserted_rows[-1].id > 0:
+        session.commit()
+        logger.info('Tags imported!')
+            
+    return tags
+
+@app.get('/data', **GET_DATA_ENDPOINT_METADATA)
 async def get_data(period: str = 'last_1_hour', start_time: str = '', end_time: str = '', name_like: str = '%') -> List[api.dto.Data] | object:
     
-    # If the user is not providing any specific time range, then the period is considered   
+    # If the user is not providing any specific time range, then the parameter 'period' is considered   
     if start_time == '' and end_time == '':
         if validate_period(period):
             start_time, end_time = calculate_period(period)
@@ -110,8 +99,8 @@ async def get_data(period: str = 'last_1_hour', start_time: str = '', end_time: 
                 
     # Selecting data
     sql_statement = sqlalchemy.select(
-                        database.models.Tags.name,                         
-                        database.models.Data.timestamp, 
+                        database.models.Tags.name,
+                        database.models.Data.timestamp,
                         database.models.Data.value) \
                         .join(database.models.Tags, database.models.Data.tag_id == database.models.Tags.id) \
                         .where(
@@ -120,7 +109,7 @@ async def get_data(period: str = 'last_1_hour', start_time: str = '', end_time: 
                                     database.models.Data.timestamp, 
                                     start_time, 
                                     end_time),
-                                database.models.Tags.name.like(name_like)                            
+                                database.models.Tags.name.like(name_like)
                             )
                         ) \
                         .order_by(database.models.Data.timestamp)
