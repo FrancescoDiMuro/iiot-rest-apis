@@ -69,18 +69,18 @@ async def get_tags(name_like: str = '%', description_like: str = '%') -> List[ap
 @app.post('/tags', **POST_TAGS_ENDPOINT_METADATA)
 async def get_tags(tags: List[api.dto.Tags]) -> List[api.dto.Tags]:
     
-    new_tags: List[database.models.Tags] = []
+    data: list = []
 
-    for tag in tags:
-        print(tag.__dict__)
-        new_tags.append(database.models.Tags(**{k:v for k,v in tag.__dict__.items()}))
+    OPTIONAL_PARAMETERS: list = ['id', 'created_at', 'updated_at']
 
-    # print(new_tags)
+    # Before passing the values to the INSERT statement, we must remove those that are optional
+    # in order to let the SQLAlchemy ORM process the default values for them (created_at, updated_at)
+    for tag in tags:        
+        data.append({k:v for k,v in tag.__dict__.items() if k not in OPTIONAL_PARAMETERS})
 
-
-    sql_statement = sqlalchemy.insert(database.models.Tags).values(new_tags).returning(database.models.Tags.id)
+    sql_statement = sqlalchemy.insert(database.models.Tags).values(data).returning(database.models.Tags.id)
     
-    inserted_rows = session.execute(sql_statement).all()
+    inserted_rows = session.execute(sql_statement).all()    
     if inserted_rows[-1].id > 0:
         session.commit()
         logger.info('Tags imported!')

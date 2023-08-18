@@ -2,6 +2,7 @@ import datetime
 import os
 
 from typing import List
+from re import search
 
 import sys
 
@@ -62,18 +63,9 @@ def validate_period(period: str) -> bool:
      - 'False' in case of failure
     '''
 
-    VALID_PERIODS: list = [
-        'minutes',
-        'hours',
-        'days',
-        'weeks',
-        'months'
-    ]
-
-    unit = period.split('_')[2]
-    unit = f'{unit}s' if not unit.endswith('s') else unit
-
-    return True if unit in VALID_PERIODS else False       
+    PERIOD_PATTERN: str = r'^last_\d+_(?:minute|hour|day|week|month)s?$'
+    
+    return search(PERIOD_PATTERN, period) is not None     
         
 
 def calculate_period(period: str) -> tuple:

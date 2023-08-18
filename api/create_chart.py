@@ -39,8 +39,8 @@ if db_engine is not None:
     with Session() as session:
 
         # Query time range
-        query_start_timestamp = '2023-08-12T00:00:00'
-        query_end_timestamp = '2023-08-13T00:00:00'
+        query_start_timestamp = '2023-08-18T00:00:00'
+        query_end_timestamp = '2023-08-19T00:00:00'
 
         sql_statement = sqlalchemy.select(
                         Tags.name, 

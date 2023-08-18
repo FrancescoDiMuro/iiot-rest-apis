@@ -1,9 +1,15 @@
+import sqlalchemy.sql.functions as sqlfuncs
+
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey, String
 from typing import List
 from datetime import datetime, timezone
 
 TIMESTAMP_FORMAT: str = '%Y-%m-%dT%H:%M:%S'
+
+def utcnow():
+    return datetime.utcnow().strftime(TIMESTAMP_FORMAT)
+
 
 class Base(DeclarativeBase):
     pass
@@ -20,8 +26,8 @@ class Tags(Base):
     low_limit: Mapped[float] = mapped_column(nullable=False)
     high_limit: Mapped[float] = mapped_column(nullable=False)
     egu: Mapped[str] = mapped_column(nullable=False)
-    created_at: Mapped[str] = mapped_column(nullable=True, server_default=datetime.now(timezone.utc).strftime(TIMESTAMP_FORMAT))
-    updated_at: Mapped[str] = mapped_column(nullable=True, server_default=datetime.now(timezone.utc).strftime(TIMESTAMP_FORMAT))
+    created_at: Mapped[str] = mapped_column(nullable=False, default=utcnow())
+    updated_at: Mapped[str] = mapped_column(nullable=False, default=utcnow)
     deleted_at: Mapped[str] = mapped_column(nullable=True)
     data: Mapped[List["Data"]] = relationship()
 

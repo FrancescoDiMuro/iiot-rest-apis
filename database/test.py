@@ -1,5 +1,6 @@
 import csv
 import json
+import os.path
 
 def read_csv(file_name: str) -> tuple:
 
@@ -48,17 +49,12 @@ def csv_to_json(file_name: str) -> str:
 
 def import_tags(file_name: str):
 
+    source_file_path, output_file_name = os.path.split(file_name)
+    output_file_name = os.path.join(source_file_path, output_file_name.replace('.csv', '.json'))
+
     json_text = csv_to_json(file_name)
     
-    with open(file_name, 'x') as o:
+    with open(output_file_name, 'x') as o:
         o.write(json_text)
 
 import_tags('./database/import_tags.csv')
-
-# sql_statement = insert(Data).values(records).returning(Data.id)
-    
-#     inserted_rows = session.execute(sql_statement).all()
-#     if inserted_rows[-1].id > 0:
-#         session.commit()
-#         logger.info(f'store_data ({tags_collection_interval}) -> OK')
-#         return True
