@@ -1,14 +1,21 @@
 import sqlalchemy.sql.functions as sqlfuncs
 
+from datetime import datetime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey, String
 from typing import List
-from datetime import datetime, timezone
+
 
 TIMESTAMP_FORMAT: str = '%Y-%m-%dT%H:%M:%S'
 
-def utcnow():
-    return datetime.utcnow().strftime(TIMESTAMP_FORMAT)
+def utcnow(format: str):
+    '''Returns the UTC datetime in string format with custom timestamp format
+    
+    Arguments: None
+    
+    Returns:
+     - UTC timestamp in specified format'''
+    return datetime.utcnow().strftime(format)
 
 
 class Base(DeclarativeBase):
@@ -26,8 +33,8 @@ class Tags(Base):
     low_limit: Mapped[float] = mapped_column(nullable=False)
     high_limit: Mapped[float] = mapped_column(nullable=False)
     egu: Mapped[str] = mapped_column(nullable=False)
-    created_at: Mapped[str] = mapped_column(nullable=False, default=utcnow())
-    updated_at: Mapped[str] = mapped_column(nullable=False, default=utcnow)
+    created_at: Mapped[str] = mapped_column(nullable=False, default=utcnow(TIMESTAMP_FORMAT))
+    updated_at: Mapped[str] = mapped_column(nullable=False, default=utcnow(TIMESTAMP_FORMAT))
     deleted_at: Mapped[str] = mapped_column(nullable=True)
     data: Mapped[List["Data"]] = relationship()
 

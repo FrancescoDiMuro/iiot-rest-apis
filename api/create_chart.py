@@ -49,7 +49,7 @@ if db_engine is not None:
                         .join(Tags, Data.tag_id == Tags.id) \
                         .where(
                             sqlalchemy.and_(
-                                Tags.name.like('%-PV'),
+                                Tags.name.like('SYSTEM2%-PV'),
                                 sqlalchemy.between(
                                     Data.timestamp, 
                                     query_start_timestamp, 
@@ -71,7 +71,7 @@ if db_engine is not None:
                         .join(Tags, Data.tag_id == Tags.id) \
                         .where(
                             sqlalchemy.and_(
-                                Tags.name.like('%-SET-%'),
+                                Tags.name.like('SYSTEM2%-SET-%'),
                                 sqlalchemy.between(
                                     Data.timestamp, 
                                     query_start_timestamp,
@@ -91,7 +91,7 @@ if db_engine is not None:
                         Tags.low_limit, 
                         Tags.high_limit, 
                         Tags.egu) \
-                        .where(Tags.name.like('%-PV'))
+                        .where(Tags.name.like('SYSTEM2%-PV'))
         
         data = session.execute(sql_statement).one()
 

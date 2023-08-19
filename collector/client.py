@@ -13,8 +13,8 @@ WORKING_DIR: str = os.getcwd()
 if WORKING_DIR not in sys.path:
     sys.path.append(WORKING_DIR)
 
-from collector.utils import plc_connect, store_data
 import database.models
+from collector.utils import plc_connect, store_data
 from database.utils import db_connect, load_tags
 from misc.utils import initialize_logger
 
@@ -48,9 +48,10 @@ if engine is not None:
 
         logger.info('Connection with PLC -> OK')
 
+        # Session initailization (without auto-commit)
         with Session() as session:
 
-            # Tags one minute
+            # Selecting tags with one minute collection interval
             sql_statement = sqlalchemy.select(
                                 database.models.Tags.id, 
                                 database.models.Tags.address) \
@@ -61,7 +62,7 @@ if engine is not None:
             
             tags_one_minute = load_tags(session, sql_statement)
 
-            # Tags five minutes
+            # Selecting tags with five minutes collection interval
             sql_statement = sqlalchemy.select(
                                 database.models.Tags.id, 
                                 database.models.Tags.address) \
