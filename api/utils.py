@@ -74,18 +74,18 @@ GET_CHART_ENDPOINT_METADATA: dict = {
 
 def validate_period(period: str) -> bool:
 
-    '''Validates given period of time for queries on Data table.
+    '''Validates given period of time.
     
     Arguments:
-     - period (str): period of time in forma 'last_amount_unit', where amount is an integer number
-     greater than zero and unit is a valid unit in VALID_PERIODS
+      - period (str): period of time in the format 'last_amount_unit', where amount is an integer number
+     greater than zero and unit is a valid unit in the pattern
 
     Returns:
      - 'True' in case of success
      - 'False' in case of failure
     '''
 
-    PERIOD_PATTERN: str = r'^last_\d+_(?:minute|hour|day|week|month)s?$'
+    PERIOD_PATTERN: str = r'^last_[1-9]\d*_(?:minute|hour|day|week|month)s?$'
     
     return search(PERIOD_PATTERN, period) is not None     
         
@@ -223,7 +223,7 @@ def generate_chart(tag_name: str, start_time: str, end_time: str, session: Sessi
         fig, ax = plt.subplots(figsize=(12.8, 7.2))
 
         # Plotting the process value data
-        ax.plot(dates, values, label='PV') # marker='.'
+        ax.plot(dates, values, label='PV')
 
         ax.set_title(tag_description).set_fontweight('bold')
         ax.grid(color='b', linewidth=0.2)
