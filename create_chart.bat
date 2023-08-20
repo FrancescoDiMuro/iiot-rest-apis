@@ -1,1 +1,0 @@
-start /B .\env\Scripts\python.exe api\create_chart.py

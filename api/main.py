@@ -1,6 +1,5 @@
 import os
 import sqlalchemy
-import sqlalchemy.sql.functions as sqlfuncs
 
 from fastapi import FastAPI, HTTPException
 from sqlalchemy.orm import Session, sessionmaker
@@ -54,26 +53,26 @@ async def root():
 async def get_tags(name_like: str = '%', description_like: str = '%') -> List[api.dto.Tags]:
     
     # List of values to return
-    l = []
+    tags: list = []
     
     sql_statement = sqlalchemy.select(database.models.Tags) \
                     .where(sqlalchemy.and_( \
-                          database.models.Tags.deleted_at == None),
+                          database.models.Tags.deleted_at.is_(None),
                           database.models.Tags.name.like(name_like),
-                          database.models.Tags.description.like(description_like)) \
+                          database.models.Tags.description.like(description_like))) \
                     .order_by(database.models.Tags.id)
     
     # https://docs.sqlalchemy.org/en/14/tutorial/data_select.html#selecting-orm-entities-and-columns
-    tags = session.scalars(sql_statement)
+    tags_scalars = session.scalars(sql_statement)
 
-    for tag in tags:
-        l.append(api.dto.Tags(**{k:v for k,v in tag.__dict__.items() if not k.startswith('_')}))
+    for tag in tags_scalars:
+        tags.append(api.dto.Tags(**{k:v for k,v in tag.__dict__.items() if not k.startswith('_')}))
 
-    return l
+    return tags
 
 # POST tags endpoint
 @app.post('/tags', **POST_TAGS_ENDPOINT_METADATA)
-async def get_tags(tags: List[api.dto.Tags]) -> List[api.dto.Tags]:
+async def post_tags(tags: List[api.dto.Tags]) -> List[api.dto.Tags]:
     
     # Data to be inserted in the DB
     data: list = []
@@ -101,7 +100,7 @@ async def get_tags(tags: List[api.dto.Tags]) -> List[api.dto.Tags]:
 async def get_data(period: str = 'last_1_hour', start_time: str = None, end_time: str = None, name_like: str = '%') -> List[api.dto.Data] | object:
     
     # List of values to return
-    l = []
+    data = []
 
     # If the user is not providing any specific time range, then the parameter 'period' is considered   
     if start_time is None or end_time is None:
@@ -127,12 +126,12 @@ async def get_data(period: str = 'last_1_hour', start_time: str = None, end_time
                         ) \
                         .order_by(database.models.Data.timestamp)
         
-    data = session.execute(sql_statement)
+    data_rows = session.execute(sql_statement)
     
-    for row in data:
-        l.append(api.dto.Data(name=row.name, timestamp=row.timestamp, value=row.value))
+    for row in data_rows:
+        data.append(api.dto.Data(name=row.name, timestamp=row.timestamp, value=row.value))
 
-    return l
+    return data
 
 
 # GET chart endpoint
