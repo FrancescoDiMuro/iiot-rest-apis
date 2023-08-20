@@ -45,7 +45,6 @@ if db_engine is not None:
 @app.get('/', **ROOT_ENDPOINT_METADATA)
 async def root():
     return RedirectResponse('http://127.0.0.1:8000/docs')
-# {'message': 'Hi! Welcome to the IIoT REST APIs Project.'}
 
 
 # GET tags endpoint
